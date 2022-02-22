@@ -1,0 +1,498 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import statsmodels.api as sm
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import RFE
+from sklearn import metrics
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+import warnings
+warnings.filterwarnings('ignore')
+
+pd.set_option('display.max_columns',None)
+pd.set_option('display.max_rows',None)
+
+df = pd.read_csv('Leads.csv')
+df.head(5)
+
+## Number of rows and columns in the dataset
+df.shape
+
+## Inspecting Datatypes of each column
+df.info()
+
+## Dealing with "Select" in categorical features, so to get true picture of the data and creating a copied dataframe so as to keep the original data intact
+
+df1 = df.copy()
+df1 = df1.replace("Select",np.nan)
+
+## Percentage of missing values in each column
+missing_vals = [feature for feature in df.columns if round(100*(df1[feature].isnull().mean()),2)>0]
+for feature in missing_vals:
+    print("{0}, has {1}% missing values".format(feature,round(100*(df1[feature].isnull().mean()),2)))
+
+#### Early data check shows many features with yes/no binary options and no missing values in them, grouping them together
+
+yn_vars = [feature for feature in df.columns if df1[feature].dtypes == "O" and (len(df1[feature].unique())<=2)]
+
+yn_vars
+
+#### Visualizing skewness in these features
+
+## Visualizing the number and name of unique values in these features
+for feature in yn_vars:
+    df1[feature].value_counts(normalize=True).plot.barh()
+    plt.title(feature)
+    plt.ylabel(feature)
+    plt.xlabel("Percentage of Values in the feature")
+    plt.show()
+    print("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
+## skewed yes no variables, used an algorithm to classify skew as 1 feature having more than 85% observations
+skewed_yn_vars = [feature for feature in yn_vars if df1[feature].value_counts(normalize=True)[0]>0.85]
+skewed_yn_vars
+
+## Categorical features
+cat_feat = [feature for feature in df1.columns if df1[feature].dtypes=="O" and feature != 'Prospect ID' and feature not in yn_vars]
+cat_feat
+
+#### Visualizing skewness(Weightage of Unique values) in these features
+
+## Visualizing the number and name of unique values in these features
+for feature in cat_feat:
+    df1[feature].value_counts(normalize=True).plot.bar()
+    plt.title(feature)
+    plt.ylabel(feature)
+    plt.xlabel("Percentage of Values in the feature")
+    plt.show()
+    print("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
+## Came up with a personalized algorithm of removing features with skewness above 70% and less than equal to 4 unique feature
+skewed_cat_features = [feature for feature in cat_feat if df1[feature].value_counts(normalize=True)[0]>0.7 and len(df1[feature].unique())<=4]
+skewed_cat_features
+
+## Removing Skewed Categorical Features 
+skewed_feat = skewed_cat_features+skewed_yn_vars
+df1.drop(skewed_feat,axis=1,inplace=True)
+
+## Percentage of total features removed because of their skewness
+print("The Percentage of Total features has been reduced by",round(100*(len(skewed_feat)/37),2))
+
+## Updating lists (yn_vars,cat_features)
+yn_vars = [feature for feature in df1.columns if df1[feature].dtypes == "O" and (len(df1[feature].unique())<=2)]
+cat_feat = [feature for feature in df1.columns if df1[feature].dtypes=="O" and feature != 'Prospect ID' and feature not in yn_vars]
+
+## Mapping yn_vars to 0 and 1
+for feature in yn_vars:
+    df1[feature] = df1[feature].map({'No':0,'Yes':1})
+
+## Missing Percentage in categorical Features
+missing_cat_feat = [feature for feature in df1.columns if feature in cat_feat and feature in missing_vals]
+for feature in missing_cat_feat:
+    print("The categorical feature, '{0}', has {1} % missing values".format(feature,round(100*(df1[feature].isnull().mean()),2)))
+
+## For categorical features, creating a missing category for null values, in the new dataframe df1
+for feature in missing_cat_feat:
+    df1[feature] = df1[feature].fillna("Missing")
+
+#### In Categorical Features, implementing a "rare_val" for any unique value that has less than 5% of observations. This will reduce the number of columns when creating dummies
+
+for feature in cat_feat:
+    temp = df1.groupby(feature)["Converted"].count()/len(df1)
+    temp_df = temp[temp>0.05].index
+    df1[feature] = np.where(df1[feature].isin(temp_df),df1[feature],"rare_val")
+
+## Visualizing the Categorical Features after all the modifications
+for feature in cat_feat:
+    df1[feature].value_counts(normalize=True).plot.bar()
+    plt.title(feature)
+    plt.ylabel(feature)
+    plt.xlabel("Percentage of Values in the feature")
+    plt.show()
+    print("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
+## Numerical Features
+num_feat = [feature for feature in df1.columns if df1[feature].dtypes != "O" and feature != "Lead Number" and feature != "Converted" and feature not in yn_vars]
+num_feat
+
+## Checking distribution of Numerical Variables
+for feature in num_feat:
+    sns.distplot(df1[feature])
+    plt.title("Distribution of {}".format(feature))
+    plt.show()
+    print("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
+#### Above distributions shows that the numerical variables, 'Asymmetrique Activity Score', 'Asymmetrique Profile Score' are almost acting as discrete variables, while others are not normally distributed.
+
+## Finding out which features are missing
+missing_num_feat = [feature for feature in df1.columns if feature in num_feat and feature in missing_vals]
+for feature in missing_num_feat:
+    print("The Numerical Feature, {0} has {1} % missing values".format(feature,round(100*(df[feature].isnull().mean()),2)))
+
+## Visualizing to witness the outlier presence in above features
+for feature in missing_num_feat:
+    sns.boxplot(data=df1, x="Converted", y=feature)
+    plt.title(feature)
+    plt.show()
+
+#### The above visualisation confirms that among most of the numerical features, there exists a whole lot of outliers.. While the discrete numeric features are distributed in a manner wherein the box occupies less space, but the whiskers are elongated, meaning these variables (Assymetrique ones) aren't well distributed as well
+
+## Imputing the numerical variables with median
+for feature in missing_num_feat:
+    med_val = df1[feature].median()
+    df1[feature] = df1[feature].fillna(med_val)
+
+## Checking, if there's still any missing values
+df1.isnull().sum()
+
+### Looks like missing values have been dealt with
+
+## Before, moving forward.. Inspecting the crucial thing, i.e., "Class Imbalance"
+
+## Class Imbalance in the Original Data
+count1 = 0 
+count0 = 0
+for i in df['Converted'].values:
+    if i == 1:
+        count1 += 1
+    else:
+        count0 += 1
+        
+count1 = (count1/len(df['Converted']))*100
+count0 = (count0/len(df['Converted']))*100
+
+x = ['Converted Population','Non-Converted Population']
+y = [count1, count0]
+
+explode = (0.1, 0)  # only "explode" the 1st slice
+
+fig1, ax1 = plt.subplots()
+ax1.pie(y, explode=explode, labels=x, autopct='%1.1f%%',
+        shadow=True, startangle=110)
+ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+plt.title('Data imbalance',fontsize=25)
+plt.show()
+
+#### Above Pie-Chart shows that our population is divided in almost 3:2 ratio of non-conversion V/s conversion, which is not ideal but decent enough to work with
+
+## Getting rid of ID columns from df1
+df1.drop(["Prospect ID","Lead Number"],1,inplace=True)
+
+## For some Numerical Bivariate analysis, visualizing scatter plots
+sns.pairplot(data=df1, x_vars=num_feat, y_vars=num_feat)
+plt.show()
+
+### Above scatter plots make the relationships between numerical features and discrete numerical features abundantly clear
+
+## Correlation Heat Map
+sns.heatmap(df1.corr(),annot=True,cmap="RdYlGn")
+plt.show()
+
+### Above Correlation Matrix reveals that the target variable isn't strongly correlated with any of the numerical variables, hence much of our model's strength must come from categorical features
+
+df1.head()
+
+## Creating Dummies for cat_feat
+dum_cat = pd.get_dummies(df1[cat_feat],drop_first=True)
+dum_cat.shape
+
+## Removing original features from dataset
+df1 = df1.drop(cat_feat,1)
+
+## Merging 2 Dataframes
+df1 = pd.concat([df1,dum_cat],axis=1)
+df1.head()
+
+#### Doing train test split
+
+train,test = train_test_split(df1, test_size=0.3, random_state=100)
+
+train.shape
+
+test.shape
+
+## Standardizing training dataset
+scaler = StandardScaler()
+train[num_feat] = scaler.fit_transform(train[num_feat])
+
+## X-y Split
+X_train = train.drop('Converted',1)
+y_train = train['Converted']
+
+## Feature Selection
+logreg = LogisticRegression()
+logreg.fit(X_train,y_train)
+
+rfe = RFE(logreg,25)
+rfe.fit(X_train,y_train)
+
+list(zip(X_train.columns,rfe.support_,rfe.ranking_))
+
+## 25 columns that were approved
+X_train2 = X_train[X_train.columns[rfe.support_]]
+
+## Making another model using statsmodels
+Xsm2 = sm.add_constant(X_train2)
+logreg2 = sm.GLM(y_train,Xsm2, family=sm.families.Binomial()).fit()
+print(logreg2.summary())
+
+## Removing "Lead Origin_rare_val" from X_train2 because of ginormous p-value
+X_train3 = X_train2.drop("Lead Origin_rare_val",1)
+
+## Adding constant
+Xsm3 = sm.add_constant(X_train3)
+
+## Training another model
+logreg3 = sm.GLM(y_train,Xsm3,family=sm.families.Binomial()).fit()
+print(logreg3.summary())
+
+## Removing "Tags_Ringing" due to p-value, from X_train3
+X_train4 = X_train3.drop(["Tags_Ringing"],1)
+
+## Adding constant
+Xsm4 = sm.add_constant(X_train4)
+
+## Training another model
+logreg4 = sm.GLM(y_train,Xsm4,family=sm.families.Binomial()).fit()
+print(logreg4.summary())
+
+X_train4.columns
+
+## Adding 'Lead Origin_Landing Page Submission', the next best feature, to X_train4 to see if it makes any difference
+X_train5 = X_train[['Total Time Spent on Website', 'Asymmetrique Activity Score',
+       'Lead Origin_Lead Add Form', 'Last Activity_Olark Chat Conversation',
+       'Last Activity_Page Visited on Website', 'Last Activity_SMS Sent',
+       'Last Activity_rare_val', 'Country_Missing',
+       'What is your current occupation_Unemployed',
+       'What is your current occupation_Working Professional',
+       'What is your current occupation_rare_val', 'Tags_Missing',
+       'Tags_Will revert after reading the email', 'Tags_rare_val',
+       'Lead Quality_Low in Relevance', 'Lead Quality_Might be',
+       'Lead Quality_Missing', 'Lead Quality_Not Sure', 'Lead Quality_Worst',
+       'Lead Profile_Potential Lead', 'Lead Profile_rare_val',
+       'Last Notable Activity_SMS Sent', 'Last Notable Activity_rare_val','Lead Origin_Landing Page Submission']]
+
+## Adding constant
+Xsm5 = sm.add_constant(X_train5)
+
+## Training another model
+logreg5 = sm.GLM(y_train,Xsm5,family=sm.families.Binomial()).fit()
+print(logreg5.summary())
+
+#### P-values are respectable enough, adding next best feature
+
+## Adding next best feature to X_train5
+X_train6 = X_train[['Total Time Spent on Website', 'Asymmetrique Activity Score',
+       'Lead Origin_Lead Add Form', 'Last Activity_Olark Chat Conversation',
+       'Last Activity_Page Visited on Website', 'Last Activity_SMS Sent',
+       'Last Activity_rare_val', 'Country_Missing',
+       'What is your current occupation_Unemployed',
+       'What is your current occupation_Working Professional',
+       'What is your current occupation_rare_val', 'Tags_Missing',
+       'Tags_Will revert after reading the email', 'Tags_rare_val',
+       'Lead Quality_Low in Relevance', 'Lead Quality_Might be',
+       'Lead Quality_Missing', 'Lead Quality_Not Sure', 'Lead Quality_Worst',
+       'Lead Profile_Potential Lead', 'Lead Profile_rare_val',
+       'Last Notable Activity_SMS Sent', 'Last Notable Activity_rare_val','Lead Origin_Landing Page Submission',
+        'How did you hear about X Education_rare_val']]
+
+## Adding constant
+Xsm6 = sm.add_constant(X_train6)
+
+## Training another model
+logreg6 = sm.GLM(y_train,Xsm6,family=sm.families.Binomial()).fit()
+print(logreg6.summary())
+
+## Repeating by adding the next best feature
+X_train7 = X_train[['Total Time Spent on Website', 'Asymmetrique Activity Score',
+       'Lead Origin_Lead Add Form', 'Last Activity_Olark Chat Conversation',
+       'Last Activity_Page Visited on Website', 'Last Activity_SMS Sent',
+       'Last Activity_rare_val', 'Country_Missing',
+       'What is your current occupation_Unemployed',
+       'What is your current occupation_Working Professional',
+       'What is your current occupation_rare_val', 'Tags_Missing',
+       'Tags_Will revert after reading the email', 'Tags_rare_val',
+       'Lead Quality_Low in Relevance', 'Lead Quality_Might be',
+       'Lead Quality_Missing', 'Lead Quality_Not Sure', 'Lead Quality_Worst',
+       'Lead Profile_Potential Lead', 'Lead Profile_rare_val',
+       'Last Notable Activity_SMS Sent', 'Last Notable Activity_rare_val','Lead Origin_Landing Page Submission',
+        'How did you hear about X Education_rare_val','How did you hear about X Education_Online Search']]
+
+## Adding constant
+Xsm7 = sm.add_constant(X_train7)
+
+## Training another model
+logreg7 = sm.GLM(y_train,Xsm7,family=sm.families.Binomial()).fit()
+print(logreg7.summary())
+
+### The next best feature has a huge p-value, hence using logreg6 model and checking multicollinearity
+
+print(logreg6.summary())
+
+## Checking multi-collinearity in the model
+vif = pd.DataFrame()
+vif["Features"] = X_train6.columns
+vif["VIF"] = [variance_inflation_factor(X_train6.values,i) for i in range(X_train6.shape[1])]
+vif["VIF"] = round(vif["VIF"],2)
+vif.sort_values("VIF", ascending=False)
+
+## logreg6 is the chosen model, and the multicollinearity levels (i.e., Variance Inflation Factor) are lower than 10% that means acceptable, but not perfect... Not removing the highest correlated values as it's p-value depicts that the feature is significant
+
+## Predicting on the test data
+y_predtrain = logreg6.predict(Xsm6)
+
+## Prediction Dataframe
+df_pred = pd.DataFrame()
+df_pred["ID"] = y_train.index
+df_pred["Converted"] = y_train.values
+df_pred["Lead_prob"] = y_predtrain.values.reshape(-1,1)
+df_pred.head(10)
+
+## Preparing df_pred for metrics
+num = [x/10 for x in range(1,10)]
+for i in num:
+    df_pred[i] = df_pred['Lead_prob'].map(lambda x:1 if x>i else 0)
+df_pred.head()
+
+### Metric Dataframe
+df_metric = pd.DataFrame(columns=['Lead_prob','Accuracy','Senstivity','Specifity','Precision_Conv','Precision_NoConv',"Recall_Conv","Recall_NoConv"])
+for i in num:
+    cm = metrics.confusion_matrix(df_pred['Converted'],df_pred[i])
+    tot = sum(sum(cm))
+    a = (cm[0,0]+cm[1,1])/tot
+    sen = cm[1,1]/(cm[1,1]+cm[1,0])
+    spec = cm[0,0]/(cm[0,0]+cm[0,1])
+    prec1 = cm[1,1]/(cm[1,1]+cm[0,1])
+    prec2 = cm[0,0]/(cm[0,0]+cm[1,0])
+    rec1 = cm[1,1]/(cm[1,1]+cm[1,0])
+    rec2 = cm[0,0]/(cm[0,0]+cm[0,1])
+    df_metric.loc[i] = [i,a,sen,spec,prec1,prec2,rec1,rec2]
+
+df_metric
+
+df_metric.plot.line(x='Lead_prob', y=['Accuracy','Senstivity','Specifity'])
+plt.show()
+
+df_metric.plot.line(x='Lead_prob', y=['Precision_Conv','Recall_Conv'])
+plt.show()
+
+df_metric.plot.line(x='Lead_prob', y=['Precision_NoConv','Recall_NoConv'])
+plt.show()
+
+### These line charts suggest our optimal Threshold probability
+### But, our model has to be of a kind which predicts the converted calls with the most accuracy, even though in the process it ends up predicting some 0s as 1s
+
+### ROC Curve
+def drawroc(actual,prob):
+    fpr,tpr,thresholds = metrics.roc_curve(actual,prob,drop_intermediate=False)
+    auc_score = metrics.roc_auc_score(actual,prob)
+    plt.plot(fpr,tpr,label = 'ROC curve (area = %0.2f)'%auc_score)
+    plt.plot([0,1],[0,1],'k--')
+    plt.xlim([0.0,1.0])
+    plt.ylim([0.0,1.1])
+    plt.xlabel('False Positive Rate or [1 - True Negative Rate]')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic')
+    plt.legend(loc="lower right")
+    plt.show()
+
+fpr,tpr,thresholds = metrics.roc_curve(df_pred['Converted'],df_pred['Lead_prob'],drop_intermediate=False)
+
+drawroc(df_pred['Converted'],df_pred['Lead_prob'])
+
+#### Receiver Operating Characteristic Curve, is respectable as well.. The Area Under the Curve is 96%, which is great
+
+## F1 score for some values of i
+for i in num[2:6]:
+    print(i,metrics.classification_report(df_pred["Converted"],df_pred[i]))
+    print("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
+## All the above metrics and ROC curve, all point to 0.4 being the optimal threshold. Hence, we're choosing 0.4 as the cutoff
+
+## Preparing the final df_pred
+df_pred.drop([0.1, 0.2, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9],1,inplace=True)
+df_pred.rename(columns={0.4:"Lead_pred"},inplace=True)
+
+# Now, we'll implement the model on Test Data and compare results
+
+test.head()
+
+## Standardizing numerical features
+test[num_feat] = scaler.transform(test[num_feat])
+
+## Setting X and y's
+X_test = test[X_train6.columns]
+y_test = test["Converted"]
+
+## Adding constant to X_test
+X_test_sm = sm.add_constant(X_test)
+
+## Predicting results
+y_predtest = logreg6.predict(X_test_sm)
+
+## Creating the test predictions dataframe
+test_pred = pd.DataFrame()
+test_pred["ID"] = y_test.index
+test_pred["Converted"] = y_test.values
+test_pred["Lead_prob"] = y_predtest.values.reshape(-1,1)
+test_pred["Lead_pred"] = test_pred["Lead_prob"].map(lambda x:1 if x>0.4 else 0)
+
+test_pred.head(10)
+
+## Some metrics of interest
+print(metrics.classification_report(test_pred["Converted"],test_pred["Lead_pred"]))
+
+## Some other metrics
+cma = metrics.confusion_matrix(test_pred["Converted"],test_pred["Lead_pred"])
+accu = round((100*(cma[1,1]+cma[0,0])/(cma[1,1]+cma[0,0]+cma[1,0]+cma[0,1])),2)
+sens = round(100*(cma[1,1]/(cma[1,1]+cma[1,0])),2)
+speci = round(100*(cma[0,0]/(cma[0,0]+cma[0,1])),2)
+print("The Accuracy in the testset is {}%".format(accu))
+print("The Sensitivity in the testset is {}%".format(sens))
+print("The Specificity in the testset is {}%".format(speci))
+
+## All the metrics give a respectable result, when compared to the ones got on the training dataset. 
+
+## Adding Score Feature to df1 dataframe
+
+df1.head()
+
+## Standardizing the entire dataframe
+df1[num_feat] = scaler.transform(df1[num_feat])
+
+X_train6.columns
+
+## Gathering the relevant columns
+master_df = df1[['Total Time Spent on Website', 'Asymmetrique Activity Score',
+       'Lead Origin_Lead Add Form', 'Last Activity_Olark Chat Conversation',
+       'Last Activity_Page Visited on Website', 'Last Activity_SMS Sent',
+       'Last Activity_rare_val', 'Country_Missing',
+       'What is your current occupation_Unemployed',
+       'What is your current occupation_Working Professional',
+       'What is your current occupation_rare_val', 'Tags_Missing',
+       'Tags_Will revert after reading the email', 'Tags_rare_val',
+       'Lead Quality_Low in Relevance', 'Lead Quality_Might be',
+       'Lead Quality_Missing', 'Lead Quality_Not Sure', 'Lead Quality_Worst',
+       'Lead Profile_Potential Lead', 'Lead Profile_rare_val',
+       'Last Notable Activity_SMS Sent', 'Last Notable Activity_rare_val',
+       'Lead Origin_Landing Page Submission',
+       'How did you hear about X Education_rare_val','Converted']]
+
+## Adding constant
+master_sm = sm.add_constant(master_df.iloc[:,:-1])
+
+## Creating the Score Column, value between 0-100(Non-Decimal)
+df1['Score'] = round(100*(logreg6.predict(master_sm)),0)
+
+df1.head(100)
+
+df1[["Score","Converted"]].corr()
+
+## As is visible in the above cell, the correlation between our derived metric ("Score") and target variable ("Converted") is more than 85% in the positive direction, meaning as the score increases so does the probability of conversion...
+
+# ALL DONE!
