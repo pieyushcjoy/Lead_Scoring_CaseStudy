@@ -1,0 +1,81 @@
+1. Which are the top three variables in your model which contribute 
+most towards the probability of a lead getting converted?
+The Top 3 variables that contribute the most are: -
+1. Tags, which has several categorical levels, but under our analysis was 
+grouped into 6 categorical levels out of which 3 affect the model with 
+respectable significances and humungous coefficients.
+2. Lead Quality, which also got grouped into 6 categories, dummies for 5 
+were created and all of them made it to the final model with great 
+significance and high coefficients.
+3. Last Activity, which had 5 categorical levels, 4 dummies created and all 
+of them made it to the model, with significant coefficients.
+“What is your current occupation” deserves a mention as 3 of its dummies are 
+also in the model, but the coefficients are not as huge as say, Tags.
+2. What are the top 3 categorical/dummy variables in the model which 
+should be focused the most on in order to increase the probability of 
+lead conversion?
+The top 3 categorical or dummy variables are: -
+1. Tags_Will revert after reading the email (Positive)
+2. Lead Quality_Worst (Negative)
+3. Tags_Missing (Positive)
+These 3 are in descending order of the impact they make. As, in Tags with above 
+2 categorical levels are most likely to convert, but a Lead Quality labelled as 
+worst is most likely to turn cold. Hence, discouraging worst lead quality and 
+encouraging other 2 traits in a lead can turn its fate.
+3. X Education has a period of 2 months every year during which they 
+hire some interns. The sales team, in particular, has around 10 
+interns allotted to them. So, during this phase, they wish to make the 
+lead conversion more aggressive. So, they want almost all of the 
+potential leads (i.e., the customers who have been predicted as 1 by 
+the model) to be converted and hence, want to make phone calls to 
+as much of such people as possible. Suggest a good strategy they 
+should employ at this stage.
+This question can be answered in 2 very different dimensions.
+• Firstly, the Analyst’s Perspective, suggests to look for the features that 
+our model has chosen and then specifically look at their respective 
+coefficients.
+Now, as we are trying to maximize sales, we suggest to narrow down all 
+the features with highly positive coefficient and try to make your leads 
+abide to these features especially. These coefficients are as follows: -
+I. Total Time Spent on Website
+II. Lead Origin_Lead Add Form 
+III. What is your current occupation_Unemployed
+IV. What is your current occupation_Working Professional
+V. Tags_Missing
+VI. Tags_rare_val etc.
+And, maybe try to suppress the features that have a negative coefficient
+like: -
+I. Lead_Quality_Might be
+II. Lead_Quality_Missing and so on.
+• And, Secondly there’s a Business side to all this. Meaning, the good old 
+Sales Strategies because computers and machines are only as good as 
+the Sales Strategies. The algorithms can certainly help determine, which 
+clients have higher chance of conversions and what not. But Sales
+Strategies cover the extra-mile, strategies like: -
+1. Delivering a well-prepared pitch.
+2. Having a competitive product (i.e., an all-rounded course)
+3. Incentivising potential customer like Discounts, referral 
+programs etc.
+4. Similarly, at times, the company reaches its target for a quarter 
+before the deadline. During this time, the company wants the sales 
+team to focus on some new work as well. So during this time, the 
+company’s aim is to not make phone calls unless it’s extremely 
+necessary, i.e. they want to minimize the rate of useless phone calls. 
+Suggest a strategy they should employ at this stage.
+1. At times like these, follow the opposite of above approach, not in a 
+negative manner like discouraging customers. But, only giving calls to the 
+customers who have a really high Score metric. 
+2. The company can also introduce some kind of test as well so the 
+students (or customers) passing these will get the final call. This will also 
+introduce a sort of exclusivity in the pool of students and ensure that only
+qualified students get in.
+3. At times like these, Sales staff will be under-utilized, they can pivot to 
+other clerical domains within the company, where extra manpower will 
+be required due to abundance of new admissions. This will also lead to 
+reduction in number of useless calls, due to lesser number of personnel. 
+4. Revocation or discouragement of Sales Strategies like discounts and 
+referrals will also help. 
+5. The Salesmen with more sales that quarter can be given gift certificates
+to a trip or some other outing. So, that they’re away and not making 
+useless calls. In process, this will also boost Employee’s Morales for the 
+next quarter
