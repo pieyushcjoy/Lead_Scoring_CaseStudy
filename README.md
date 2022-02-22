@@ -1,7 +1,6 @@
 # Lead_Scoring_CaseStudy
 
-LEADS SCORING 
-ASSIGNMENT SUMMARY...
+LEADS SCORING  SUMMARY...
 A Brief Overview of The Problem Statement: -
 X Education, an Education company, sells online courses to 
 Professionals. They have abundance of potential leads who visit their 
